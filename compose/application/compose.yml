@@ -1,6 +1,20 @@
 x-frappe-common: &frappe-common
   image: ${FRAPPE_SUITE_IMAGE:?Set a pinned GHCR suite digest}
   restart: unless-stopped
+  # Frappe's site directory MUST be a real mounted NFS filesystem.
+  # Docker create_host_path:false alone does not establish that a remote mount is active.
+  # The original image entrypoint still runs afterwards to link built assets.
+  entrypoint:
+    - /bin/bash
+    - -ec
+    - |
+      fs=$(stat -f -c %T /home/frappe/frappe-bench/sites)
+      case "$fs" in
+        nfs|nfs4) ;;
+        *) echo "FATAL: Frappe sites is $fs, expected NFS; refusing to start" >&2; exit 70 ;;
+      esac
+      exec /usr/local/bin/entrypoint.sh "$@"
+    - verify-sites-nfs
   volumes:
     - type: bind
       source: /mnt/frappe-sites
@@ -14,6 +28,8 @@ services:
     restart: "no"
     entrypoint: ["bash", "-ec"]
     command: |
+      fs=$(stat -f -c %T sites)
+      case "$fs" in nfs|nfs4) ;; *) echo "FATAL: sites is not an active NFS mount" >&2; exit 70 ;; esac
       ls -1 apps > sites/apps.txt
       bench set-config -g db_host "$$DB_HOST"
       bench set-config -gp db_port "$$DB_PORT"
@@ -29,6 +45,7 @@ services:
 
   backend:
     <<: *frappe-common
+    command: ["start.sh"]
     depends_on:
       configurator:
         condition: service_completed_successfully
