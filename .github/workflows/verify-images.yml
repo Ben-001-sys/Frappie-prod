@@ -40,7 +40,7 @@ jobs:
             test -d /home/frappe/frappe-bench/apps/frappe
             command -v bench
             if [ "${FLAVOR}" = suite ]; then
-              for app in erpnext hrms crm helpdesk lms raven; do
+              for app in erpnext hrms crm telephony helpdesk payments lms raven; do
                 test -d "/home/frappe/frappe-bench/apps/${app}"
               done
             else

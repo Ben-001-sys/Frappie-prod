@@ -4,11 +4,11 @@ Source repository for CETECH-style Frappe Suite multi-host infrastructure and im
 
 ## Images
 
-- `ghcr.io/ben-001-sys/frappie-suite` — Frappe Framework v15, ERPNext, HRMS, CRM, Helpdesk, LMS and Raven. One identical image is reused across application and worker containers.
+- `ghcr.io/ben-001-sys/frappie-suite` — Frappe Framework v15, ERPNext, HRMS, CRM, Helpdesk, LMS and Raven, plus the required Telephony and Payments dependency apps. One identical image is reused across application and worker containers.
 - `ghcr.io/ben-001-sys/frappie-insights` — separate Frappe v15 / Insights v3 application.
 - MariaDB and Redis use official upstream images; they do not require custom image builds.
 
-Image builds are triggered by changes to app manifests or the image workflow and published under commit-SHA tags. Deployment is **manual**, not part of the build pipeline. See [Actions](https://github.com/Ben-001-sys/Frappie-prod/actions) for build status. A successful build does not imply successful app installation.
+Image builds are triggered by changes to app manifests or the image workflow and published under commit-SHA tags. Deployment is **manual**, not part of the build pipeline. See [Actions](https://github.com/Ben-001-sys/Frappie-prod/actions) for build status. A successful build does not imply successful app installation; the Bench smoke-install workflow automatically tests every published image set.
 
 ## Dokploy Compose projects
 

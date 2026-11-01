@@ -9,7 +9,7 @@ if [ -f "sites/$SITE/site_config.json" ]; then
   exit 1
 fi
 bench new-site "$SITE" --db-type mariadb --db-host "$DB_HOST" --db-port 3306 --db-root-username "$DB_SETUP_USER" --mariadb-user-host-login-scope='%'
-for app in erpnext hrms crm helpdesk lms raven; do
+for app in erpnext hrms crm telephony helpdesk payments lms raven; do
   echo "Installing app $app into $SITE"
   bench --site "$SITE" install-app "$app"
 done

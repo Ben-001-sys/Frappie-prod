@@ -8,7 +8,7 @@ import yaml
 root = Path(__file__).resolve().parents[1]
 issues = []
 for flavor, expected in {
-    'suite': {'erpnext', 'hrms', 'crm', 'helpdesk', 'lms', 'raven'},
+    'suite': {'erpnext', 'hrms', 'crm', 'telephony', 'helpdesk', 'payments', 'lms', 'raven'},
     'insights': {'insights'},
 }.items():
     try:

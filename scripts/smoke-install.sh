@@ -69,7 +69,7 @@ docker run --rm --network "$network" \
       --admin-password "$TEST_ADMIN_PASSWORD" \
       --mariadb-user-host-login-scope="%"
     if [ "$FLAVOR" = "suite" ]; then
-      apps=(erpnext hrms crm helpdesk lms raven)
+      apps=(erpnext hrms crm telephony helpdesk payments lms raven)
     else
       apps=(insights)
     fi
