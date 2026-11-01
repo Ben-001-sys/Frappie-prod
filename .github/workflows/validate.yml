@@ -1,0 +1,25 @@
+name: Validate infrastructure
+on:
+  push:
+    branches: [main, 'infra/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install YAML parser
+        run: python -m pip install 'PyYAML==6.0.2'
+      - name: Validate version manifests and Compose files
+        run: python scripts/validate.py
+      - name: Check shell syntax
+        run: |
+          for script in scripts/*.sh; do bash -n "$script"; done

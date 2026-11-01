@@ -1,0 +1,72 @@
+name: Build Frappe images to GHCR
+on:
+  push:
+    branches: [main, 'infra/**']
+    paths:
+      - 'apps/**'
+      - '.github/workflows/build-images.yml'
+      - 'docs/RELEASE.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: build-images-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    name: Build ${{ matrix.flavor }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [suite, insights]
+    steps:
+      - name: Checkout Frappie-prod
+        uses: actions/checkout@v4
+      - name: Checkout pinned upstream frappe_docker builder
+        uses: actions/checkout@v4
+        with:
+          repository: frappe/frappe_docker
+          ref: 61d35da827ebc04d01b64c9e78385597ccebc9d8
+          path: upstream/frappe_docker
+          persist-credentials: false
+      - name: Validate application manifest
+        run: python -m json.tool apps/${{ matrix.flavor }}.json >/dev/null
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log into GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        id: image
+        with:
+          context: ./upstream/frappe_docker
+          file: ./upstream/frappe_docker/images/layered/Containerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/ben-001-sys/frappie-${{ matrix.flavor }}:sha-${{ github.sha }}
+          secret-files: |
+            apps_json=./apps/${{ matrix.flavor }}.json
+          build-args: |
+            FRAPPE_PATH=https://github.com/frappe/frappe
+            FRAPPE_BRANCH=version-15
+            CACHE_BUST=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.flavor }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.flavor }}
+          provenance: mode=max
+          sbom: true
+      - name: Publish immutable digest in job summary
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          FLAVOR: ${{ matrix.flavor }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          echo "### Published ${FLAVOR} image" >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/ben-001-sys/frappie-${FLAVOR}@${IMAGE_DIGEST}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source commit: ${GIT_SHA}" >> "$GITHUB_STEP_SUMMARY"
