@@ -36,7 +36,28 @@ for path in (root / '.github/workflows').glob('*.yml'):
         assert 'on' in data and 'jobs' in data
     except Exception as exc:
         issues.append(f'{path.relative_to(root)}: {exc}')
+# Ensure staging Compose image references cannot silently drift apart.
+import re
+try:
+    approved = json.loads((root / 'release/verified-staging.json').read_text())
+    assert approved['classification'] == 'staging-candidate'
+    expected_images = approved['images']
+    for flavor in ('suite', 'insights'):
+        uri = expected_images[flavor]
+        assert re.fullmatch(r'ghcr\.io/ben-001-sys/frappie-' + flavor + r'@sha256:[0-9a-f]{64}', uri), uri
+    for path, flavor, name in [
+        ('env/application.env.example', 'suite', 'FRAPPE_SUITE_IMAGE'),
+        ('env/workers.env.example', 'suite', 'FRAPPE_SUITE_IMAGE'),
+        ('env/insights.env.example', 'insights', 'FRAPPE_INSIGHTS_IMAGE')
+    ]:
+        line = name + '=' + expected_images[flavor]
+        assert line in (root / path).read_text().splitlines(), f'{path}: expected pinned image {line}'
+    assert approved['tests']['suite_site_create_install_migrate'] == 'passed'
+    assert approved['tests']['insights_site_create_install_migrate'] == 'passed'
+except Exception as exc:
+    issues.append(f'release/verified-staging.json: {exc}')
 if issues:
     print('\n'.join('FAIL '+i for i in issues), file=sys.stderr)
     sys.exit(1)
-print('Static validation passed; runtime builds, network and app compatibility remain unverified.')
+
+print('Static validation passed: app manifests, release images, Compose syntax, and workflow YAML.')

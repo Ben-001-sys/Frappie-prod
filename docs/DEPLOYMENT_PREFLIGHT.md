@@ -1,6 +1,6 @@
 # Staging deployment readiness checklist
 
-The images in [IMAGES.md](IMAGES.md) are **build-and-pull verified**, not yet declared operationally compatible until both Bench smoke installs pass.
+The immutable images in [IMAGES.md](IMAGES.md) **passed** full disposable Bench site-create, install-app and migrate tests on 2026-11-01 (workflow run 41343888317). Multi-host Docker, NFS, networking, authorization, operational backups and real end-to-end workflows remain **untested**; production approval is not granted.
 
 ## Planned Dokploy remote hosts
 

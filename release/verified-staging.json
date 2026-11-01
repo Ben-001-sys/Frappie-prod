@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "classification": "staging-candidate",
+  "created_utc": "2026-11-01",
+  "source_commit": "3a0744e1571298e7f89a716539db4b1c32346137",
+  "images": {
+    "suite": "ghcr.io/ben-001-sys/frappie-suite@sha256:aad7925a4b03639aa3834d53098b2c09b7a7fd46c7486faace6d9e142a132a8c",
+    "insights": "ghcr.io/ben-001-sys/frappie-insights@sha256:0805634533566ab52f32b1348358c6be7ae240bfcf0378a9f96743ca9fc14d6c"
+  },
+  "evidence": {
+    "build_run": 41341240098,
+    "verify_run": 41343888063,
+    "bench_smoke_run": 41343888317
+  },
+  "tests": {
+    "suite_site_create_install_migrate": "passed",
+    "insights_site_create_install_migrate": "passed",
+    "distributed_dokploy_nfs": "not-run",
+    "backup_restore": "not-run"
+  }
+}
