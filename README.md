@@ -21,6 +21,17 @@ Image builds are triggered by changes to app manifests or the image workflow and
 
 The Dokploy management server is an additional control-plane role. Independent remote hosts have no implicit shared Docker network.
 
+## Current tested staging release
+
+Both Suite and Insights Docker images built and published successfully and passed disposable Frappe Bench site creation, app installation and migration tests on 2026-11-01.
+
+- [Verified immutable image release](release/verified-staging.json)
+- [Image digests and GitHub Actions evidence](docs/IMAGES.md)
+- [First-run staging deployment guide](docs/STAGING_FIRST_RUN.md)
+- [OVHcloud managed NFS and private-network planning](docs/OVH_STAGING_PROVISIONING.md)
+
+**This is a staging candidate, not a production approval.** The four-host topology and backups still need real infrastructure testing.
+
 ## Proof-of-concept deployment order
 
 1. Verify v15 compatibility and inspect the Actions image-build results; record exact manifest digests.
