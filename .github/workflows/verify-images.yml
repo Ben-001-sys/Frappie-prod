@@ -1,0 +1,50 @@
+name: Verify published Frappe images
+on:
+  workflow_run:
+    workflows: ["Build Frappe images to GHCR"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      image_sha:
+        description: "Full source commit SHA of published images"
+        required: true
+        type: string
+permissions:
+  contents: read
+  packages: read
+jobs:
+  verify:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [suite, insights]
+    steps:
+      - name: Log into GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate image and included apps
+        env:
+          IMAGE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.image_sha || github.event.workflow_run.head_sha }}
+          FLAVOR: ${{ matrix.flavor }}
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/ben-001-sys/frappie-${FLAVOR}:sha-${IMAGE_SHA}"
+          docker pull "$IMAGE"
+          docker run --rm --entrypoint bash "$IMAGE" -lc '
+            set -euo pipefail
+            test -d /home/frappe/frappe-bench/apps/frappe
+            command -v bench
+            if [ "${FLAVOR}" = suite ]; then
+              for app in erpnext hrms crm helpdesk lms raven; do
+                test -d "/home/frappe/frappe-bench/apps/${app}"
+              done
+            else
+              test -d /home/frappe/frappe-bench/apps/insights
+            fi
+          '
+          docker image inspect "$IMAGE" --format '{{index .RepoDigests 0}}' >> "$GITHUB_STEP_SUMMARY"
