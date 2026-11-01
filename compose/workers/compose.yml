@@ -1,0 +1,60 @@
+x-frappe-worker: &frappe-worker
+  image: ${FRAPPE_SUITE_IMAGE:?Same pinned suite digest as application}
+  restart: unless-stopped
+  volumes:
+    - type: bind
+      source: /mnt/frappe-sites
+      target: /home/frappe/frappe-bench/sites
+      bind:
+        create_host_path: false
+
+services:
+  redis-cache:
+    image: ${REDIS_IMAGE:?Set Redis image version}
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--aclfile", "/run/redis/cache.acl"]
+    ports:
+      - "${WORKER_PRIVATE_IP:?Worker private address}:6379:6379"
+    volumes:
+      - type: bind
+        source: ${REDIS_ACL_DIR:?Private Redis ACL path}/cache.acl
+        target: /run/redis/cache.acl
+        read_only: true
+        bind:
+          create_host_path: false
+
+  redis-queue:
+    image: ${REDIS_IMAGE:?Set Redis image version}
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--aclfile", "/run/redis/queue.acl"]
+    ports:
+      - "${WORKER_PRIVATE_IP:?Worker private address}:6380:6379"
+    volumes:
+      - redis_queue_data:/data
+      - type: bind
+        source: ${REDIS_ACL_DIR:?Private Redis ACL path}/queue.acl
+        target: /run/redis/queue.acl
+        read_only: true
+        bind:
+          create_host_path: false
+
+  queue-short:
+    <<: *frappe-worker
+    profiles: ["site-ready"]
+    command: ["bench", "worker", "--queue", "short,default"]
+    depends_on: [redis-queue]
+
+  queue-long:
+    <<: *frappe-worker
+    profiles: ["site-ready"]
+    command: ["bench", "worker", "--queue", "long,default,short"]
+    depends_on: [redis-queue]
+
+  scheduler:
+    <<: *frappe-worker
+    profiles: ["site-ready"]
+    command: ["bench", "schedule"]
+    depends_on: [redis-queue]
+
+volumes:
+  redis_queue_data:

@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+*.env
+!*.env.example
+**/site_config.json
+**/common_site_config.json
+**/*.sql
+**/*.sql.gz
+**/*backup*
+*.pem
+*.key
+*.p12
+**/redis/*.acl
+__pycache__/
+*.pyc
+.DS_Store

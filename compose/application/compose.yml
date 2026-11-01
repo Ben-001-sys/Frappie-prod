@@ -1,0 +1,57 @@
+x-frappe-common: &frappe-common
+  image: ${FRAPPE_SUITE_IMAGE:?Set a pinned GHCR suite digest}
+  restart: unless-stopped
+  volumes:
+    - type: bind
+      source: /mnt/frappe-sites
+      target: /home/frappe/frappe-bench/sites
+      bind:
+        create_host_path: false
+
+services:
+  configurator:
+    <<: *frappe-common
+    restart: "no"
+    entrypoint: ["bash", "-ec"]
+    command: |
+      ls -1 apps > sites/apps.txt
+      bench set-config -g db_host "$$DB_HOST"
+      bench set-config -gp db_port "$$DB_PORT"
+      bench set-config -g redis_cache "$$REDIS_CACHE_URL"
+      bench set-config -g redis_queue "$$REDIS_QUEUE_URL"
+      bench set-config -g redis_socketio "$$REDIS_QUEUE_URL"
+      bench set-config -gp socketio_port 9000
+    environment:
+      DB_HOST: ${DB_HOST:?Private MariaDB host}
+      DB_PORT: "3306"
+      REDIS_CACHE_URL: ${REDIS_CACHE_URL:?Authenticated Redis cache URL}
+      REDIS_QUEUE_URL: ${REDIS_QUEUE_URL:?Authenticated Redis queue URL}
+
+  backend:
+    <<: *frappe-common
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    environment:
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
+
+  websocket:
+    <<: *frappe-common
+    command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+  frontend:
+    <<: *frappe-common
+    command: ["nginx-entrypoint.sh"]
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: ${FRAPPE_SITE_NAME:?Set operational hostname}
+      CLIENT_MAX_BODY_SIZE: 50m
+    expose: ["8080"]
+    depends_on:
+      - backend
+      - websocket

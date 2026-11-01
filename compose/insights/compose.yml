@@ -1,0 +1,110 @@
+x-insights: &insights
+  image: ${FRAPPE_INSIGHTS_IMAGE:?Set pinned Insights image}
+  restart: unless-stopped
+  volumes:
+    - insights_sites:/home/frappe/frappe-bench/sites
+
+services:
+  insights-db:
+    image: ${INSIGHTS_MARIADB_IMAGE:?Set compatible MariaDB image}
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${INSIGHTS_DB_ROOT_PASSWORD:?Set secret}
+      MARIADB_ROOT_HOST: "%"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+    volumes:
+      - insights_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  redis-cache:
+    image: ${REDIS_IMAGE:?Set Redis image}
+    restart: unless-stopped
+
+  redis-queue:
+    image: ${REDIS_IMAGE:?Set Redis image}
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - insights_queue_data:/data
+
+  configurator:
+    <<: *insights
+    restart: "no"
+    entrypoint: ["bash", "-ec"]
+    command: |
+      ls -1 apps > sites/apps.txt
+      bench set-config -g db_host insights-db
+      bench set-config -gp db_port 3306
+      bench set-config -g redis_cache redis://redis-cache:6379
+      bench set-config -g redis_queue redis://redis-queue:6379
+      bench set-config -g redis_socketio redis://redis-queue:6379
+      bench set-config -gp socketio_port 9000
+    depends_on:
+      insights-db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+      redis-queue:
+        condition: service_started
+
+  backend:
+    <<: *insights
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+  websocket:
+    <<: *insights
+    command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+  frontend:
+    <<: *insights
+    command: ["nginx-entrypoint.sh"]
+    expose: ["8080"]
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: ${INSIGHTS_SITE_NAME:?Insights site hostname}
+    depends_on:
+      - backend
+      - websocket
+
+  queue-short:
+    <<: *insights
+    profiles: ["site-ready"]
+    command: ["bench", "worker", "--queue", "short,default"]
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+  queue-long:
+    <<: *insights
+    profiles: ["site-ready"]
+    command: ["bench", "worker", "--queue", "long,default,short"]
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+  scheduler:
+    <<: *insights
+    profiles: ["site-ready"]
+    command: ["bench", "schedule"]
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+volumes:
+  insights_sites:
+  insights_db_data:
+  insights_queue_data:
