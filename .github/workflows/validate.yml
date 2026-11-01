@@ -20,6 +20,15 @@ jobs:
         run: python -m pip install 'PyYAML==6.0.2'
       - name: Validate version manifests and Compose files
         run: python scripts/validate.py
+      - name: Validate Dokploy Compose interpolation on all four projects
+        run: |
+          set -euo pipefail
+          docker compose version
+          for component in database workers application insights; do
+            echo "Checking Compose resource: $component"
+            docker compose --env-file "env/$component.env.example" \
+              -f "compose/$component/compose.yml" config --quiet
+          done
       - name: Check shell syntax
         run: |
           for script in scripts/*.sh; do bash -n "$script"; done
