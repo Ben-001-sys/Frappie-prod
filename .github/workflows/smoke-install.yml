@@ -1,0 +1,51 @@
+name: Smoke install Frappe images
+on:
+  push:
+    paths:
+      - '.github/workflows/smoke-install.yml'
+      - 'scripts/smoke-install.sh'
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read
+concurrency:
+  group: smoke-install-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  install:
+    name: Bench site install (${{ matrix.flavor }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: suite
+            image: ghcr.io/ben-001-sys/frappie-suite@sha256:06935660af52833122ed4b982b6c0504144e21d95b483f81042529c372006e20
+          - flavor: insights
+            image: ghcr.io/ben-001-sys/frappie-insights@sha256:1d38d782b9a3c9d03ed5051c4eff7ca8a232a8f33094bd2018ae5cb62e24cee4
+    env:
+      FLAVOR: ${{ matrix.flavor }}
+      TEST_IMAGE: ${{ matrix.image }}
+      TEST_DB_PASSWORD: smoke_test_only_root_pw_3B2c8a
+      TEST_ADMIN_PASSWORD: smoke_test_only_admin_pw_7G9d2h
+      SMOKE_SITE: smoke.local
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run isolated Bench site creation and app install
+        run: bash scripts/smoke-install.sh
+      - name: Collect MariaDB logs after failure
+        if: failure()
+        run: docker logs --tail 100 "smoke-db-${{ matrix.flavor }}" || true
+      - name: Cleanup temporary test environment
+        if: always()
+        run: |
+          docker rm -f "smoke-db-${{ matrix.flavor }}" "smoke-redis-${{ matrix.flavor }}" 2>/dev/null || true
+          docker network rm "frappe-smoke-${{ matrix.flavor }}" 2>/dev/null || true
+          docker volume rm "frappe-sites-smoke-${{ matrix.flavor }}" 2>/dev/null || true
