@@ -17,6 +17,14 @@ Record these values in a private inventory, not in the public GitHub repository:
 
 Do not deploy the test environment to the existing production Frappe site or production MariaDB. The test must have its own domain and database.
 
+## Managed NFS capacity and region gate
+
+**Check the actual OVHcloud region and service availability before ordering.** OVHcloud's public File Storage product page currently advertises share sizes starting at **150 GiB**, not the 20–50 GiB previously considered for this proof of concept. Expect this to affect monthly staging cost. Do not assume a smaller share can be created.
+
+The [official File Storage setup guide](https://docs.ovhcloud.com/en/guides/storage-and-backup/file-storage/file-storage-service/getting-started) documents private-network association, ACLs and a provider-supplied export path. Obtain the exact mount command from the created share, and check whether NFSv4 is supported for that provisioned service; do not mix protocol assumptions from older OVHcloud marketing pages and newer setup instructions. The share must be in a compatible region/network reachable by both staging clients.
+
+**Cost approval gate:** Before creating billable OVH resources, record the region, VM flavors, managed NFS plan/minimum size, hourly pricing, bandwidth and snapshot charges. User approval is required for billable provisioning.
+
 ## Private network and firewall
 
 - Put the four instances and managed NFS in an appropriate private network/vRack with verified end-to-end routes. Different Compose projects do **not** share Docker DNS.
