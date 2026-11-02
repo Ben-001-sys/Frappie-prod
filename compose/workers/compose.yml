@@ -8,10 +8,9 @@ x-frappe-worker: &frappe-worker
     - /bin/bash
     - -ec
     - |
-      fs=$(stat -f -c %T /home/frappe/frappe-bench/sites)
-      case "$fs" in
+      case "$(stat -f -c %T /home/frappe/frappe-bench/sites)" in
         nfs|nfs4) ;;
-        *) echo "FATAL: Frappe sites is $fs, expected NFS; refusing to start" >&2; exit 70 ;;
+        *) echo "FATAL: Frappe sites must be on NFS; refusing to start" >&2; exit 70 ;;
       esac
       exec /usr/local/bin/entrypoint.sh "$@"
     - verify-sites-nfs
