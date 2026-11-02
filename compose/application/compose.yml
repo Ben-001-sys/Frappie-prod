@@ -37,6 +37,11 @@ services:
           *) echo "FATAL: sites must be on NFS; refusing to configure" >&2; exit 70 ;;
         esac
         ls -1 apps > sites/apps.txt
+        # A fresh NFS sites directory has no common_site_config.json.
+        # Frappe's bench set-config expects it to exist; initialize only once.
+        if [ ! -e sites/common_site_config.json ]; then
+          (umask 077; printf '{}\n' > sites/common_site_config.json)
+        fi
         bench set-config -g db_host "$(printenv DB_HOST)"
         bench set-config -gp db_port "$(printenv DB_PORT)"
         bench set-config -g redis_cache "$(printenv REDIS_CACHE_URL)"
