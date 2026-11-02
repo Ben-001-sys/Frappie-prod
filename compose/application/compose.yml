@@ -63,6 +63,7 @@ services:
     environment:
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
       GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
+      NLTK_DATA: /home/frappe/frappe-bench/sites/.nltk_data
 
   websocket:
     <<: *frappe-common
