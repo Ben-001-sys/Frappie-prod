@@ -8,10 +8,9 @@ x-frappe-common: &frappe-common
     - /bin/bash
     - -ec
     - |
-      fs=$(stat -f -c %T /home/frappe/frappe-bench/sites)
-      case "$fs" in
+      case "$(stat -f -c %T /home/frappe/frappe-bench/sites)" in
         nfs|nfs4) ;;
-        *) echo "FATAL: Frappe sites is $fs, expected NFS; refusing to start" >&2; exit 70 ;;
+        *) echo "FATAL: Frappe sites must be on NFS; refusing to start" >&2; exit 70 ;;
       esac
       exec /usr/local/bin/entrypoint.sh "$@"
     - verify-sites-nfs
@@ -26,24 +25,23 @@ services:
   configurator:
     <<: *frappe-common
     restart: "no"
-    # Put the complete script in bash -c's argument, not a Compose command string.
-    # Compose interpolates $names; $ preserves shell variables until runtime.
+    # Pass the entire configuration script as one Bash argument.
+    # Command substitution avoids Compose interpolation of shell variable names.
     entrypoint:
       - /bin/bash
       - -ec
       - |
         cd /home/frappe/frappe-bench
-        fs=$(stat -f -c %T sites)
-        case "$fs" in
+        case "$(stat -f -c %T sites)" in
           nfs|nfs4) ;;
-          *) echo "FATAL: sites filesystem is $fs, expected NFS" >&2; exit 70 ;;
+          *) echo "FATAL: sites must be on NFS; refusing to configure" >&2; exit 70 ;;
         esac
         ls -1 apps > sites/apps.txt
-        bench set-config -g db_host "$DB_HOST"
-        bench set-config -gp db_port "$DB_PORT"
-        bench set-config -g redis_cache "$REDIS_CACHE_URL"
-        bench set-config -g redis_queue "$REDIS_QUEUE_URL"
-        bench set-config -g redis_socketio "$REDIS_QUEUE_URL"
+        bench set-config -g db_host "$(printenv DB_HOST)"
+        bench set-config -gp db_port "$(printenv DB_PORT)"
+        bench set-config -g redis_cache "$(printenv REDIS_CACHE_URL)"
+        bench set-config -g redis_queue "$(printenv REDIS_QUEUE_URL)"
+        bench set-config -g redis_socketio "$(printenv REDIS_QUEUE_URL)"
         bench set-config -gp socketio_port 9000
     environment:
       DB_HOST: ${DB_HOST:?Private MariaDB host}
