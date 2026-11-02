@@ -1,6 +1,8 @@
 x-frappe-worker: &frappe-worker
   image: ${FRAPPE_SUITE_IMAGE:?Same pinned suite digest as application}
   restart: unless-stopped
+  environment:
+    NLTK_DATA: /home/frappe/frappe-bench/sites/.nltk_data
   # Frappe's site directory MUST be a real mounted NFS filesystem.
   # Docker create_host_path:false alone does not establish that a remote mount is active.
   # The original image entrypoint still runs afterwards to link built assets.
