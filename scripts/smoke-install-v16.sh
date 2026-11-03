@@ -127,3 +127,43 @@ docker run --rm --network "$network" \
     bench version --format plain
     echo "SMOKE SUCCESS: Nine v16 candidate apps installed and migrated with MariaDB 11.8"
   '
+
+echo '=== Regression: login user cache must skip virtual active_sessions dict rows ==='
+docker run --rm --network "$network" \
+  -v "$volume:/home/frappe/frappe-bench/sites" \
+  -e SMOKE_SITE -e FRAPPE_STREAM_LOGGING=1 \
+  --entrypoint bash "$TEST_IMAGE" -ec '
+    set -euo pipefail
+    cd /home/frappe/frappe-bench/sites
+    /home/frappe/frappe-bench/env/bin/python - <<PY
+import os
+import frappe
+from frappe.core.doctype.user.user import User
+from frappe.utils.user import UserPermissions
+
+site = os.environ["SMOKE_SITE"]
+frappe.init(site, sites_path=".")
+try:
+    frappe.connect()
+    frappe.local.session.user = "Administrator"
+
+    doc = frappe.get_doc("User", "Administrator")
+    assert "active_sessions" in doc._table_fieldnames
+    assert "active_sessions" not in doc._non_computed_table_fieldnames
+
+    # Reproduce populated sessions in the virtual computed table without
+    # persisting fabricated session records or exposing credentials.
+    original = User.active_sessions
+    User.active_sessions = property(lambda self: [{"name": "smoke-session"}])
+    try:
+        frappe.cache.hdel("user_doc", "Administrator")
+        permissions = UserPermissions("Administrator")
+        assert permissions.doc.name == "Administrator"
+        print("LOGIN REGRESSION PASS: Administrator user cache handles virtual session dicts")
+    finally:
+        User.active_sessions = original
+        frappe.cache.hdel("user_doc", "Administrator")
+finally:
+    frappe.destroy()
+PY
+  '
