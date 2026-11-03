@@ -1,26 +1,55 @@
 #!/usr/bin/env bash
-# Disposable v16 Suite install smoke test. Never touches operational sites or databases.
+# Isolated, disposable Frappe v16 fresh-install smoke test.
+# Never mounts the real staging NFS share or connects to staging MariaDB/Redis.
 set -euo pipefail
 
-: "${TEST_IMAGE:?Published candidate image required}"
-: "${TEST_DB_PASSWORD:?Disposable MariaDB password required}"
-: "${TEST_ADMIN_PASSWORD:?Disposable site administrator password required}"
+: "${TEST_IMAGE:?Set the published v16 candidate image}"
+: "${TEST_DB_PASSWORD:?Set a disposable MariaDB root password}"
+: "${TEST_ADMIN_PASSWORD:?Set a disposable site Administrator password}"
 
 SMOKE_SITE="${SMOKE_SITE:-smoke-v16.local}"
-network="frappe-v16-smoke"
-db="frappe-v16-smoke-db"
-redis="frappe-v16-smoke-redis"
-volume="frappe-v16-smoke-sites"
+suffix="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-$(date +%s)-$$"
+prefix="frappe-v16-smoke-${suffix}"
+network="${prefix}-network"
+db="${prefix}-db"
+redis="${prefix}-redis"
+volume="${prefix}-sites"
+made_network=0
+made_volume=0
+made_db=0
+made_redis=0
 
 cleanup() {
-  docker rm -f "$db" "$redis" >/dev/null 2>&1 || true
-  docker network rm "$network" >/dev/null 2>&1 || true
-  docker volume rm "$volume" >/dev/null 2>&1 || true
+  status=$?
+  trap - EXIT
+  set +e
+  if (( status != 0 )); then
+    echo '=== Disposable MariaDB logs (failure only) ===' >&2
+    if (( made_db )); then docker logs --tail 100 "$db" >&2; fi
+    echo '=== Disposable Redis logs (failure only) ===' >&2
+    if (( made_redis )); then docker logs --tail 50 "$redis" >&2; fi
+  fi
+  if (( made_db )); then docker rm -f "$db" >/dev/null 2>&1; fi
+  if (( made_redis )); then docker rm -f "$redis" >/dev/null 2>&1; fi
+  if (( made_network )); then docker network rm "$network" >/dev/null 2>&1; fi
+  if (( made_volume )); then docker volume rm "$volume" >/dev/null 2>&1; fi
+  exit "$status"
 }
 trap cleanup EXIT
 
-docker network create "$network"
-docker volume create "$volume"
+# Refuse reuse of previously existing resources, even on a shared test runner.
+if docker network inspect "$network" >/dev/null 2>&1 ||
+   docker volume inspect "$volume" >/dev/null 2>&1 ||
+   docker container inspect "$db" >/dev/null 2>&1 ||
+   docker container inspect "$redis" >/dev/null 2>&1; then
+  echo "ERROR: Disposable resource-name collision. Refusing to use existing data." >&2
+  exit 1
+fi
+
+docker network create "$network" >/dev/null
+made_network=1
+docker volume create "$volume" >/dev/null
+made_volume=1
 
 docker run -d --name "$db" --network "$network" \
   -e MARIADB_ROOT_PASSWORD="$TEST_DB_PASSWORD" \
@@ -28,33 +57,45 @@ docker run -d --name "$db" --network "$network" \
   mariadb:11.8 \
   --character-set-server=utf8mb4 \
   --collation-server=utf8mb4_unicode_ci \
-  --skip-character-set-client-handshake
+  --skip-character-set-client-handshake >/dev/null
+made_db=1
 
 docker run -d --name "$redis" --network "$network" \
-  redis:7.4-alpine redis-server --appendonly no
+  redis:7.4-alpine redis-server --appendonly no >/dev/null
+made_redis=1
 
 ready=0
 for attempt in $(seq 1 120); do
-  if docker exec "$db" healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1 \
-    && docker exec "$redis" redis-cli ping | grep -q PONG; then
+  if docker exec "$db" healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1 &&
+     docker exec "$redis" redis-cli ping | grep -qx PONG; then
     ready=1
     break
   fi
   sleep 2
 done
-if [ "$ready" != 1 ]; then
-  echo "ERROR: Disposable MariaDB 11.8 / Redis did not become healthy" >&2
+if (( ready != 1 )); then
+  echo 'ERROR: Disposable MariaDB 11.8 or Redis did not become healthy' >&2
   exit 1
 fi
 
+docker exec "$db" mariadbd --version
 docker pull "$TEST_IMAGE"
 
-echo 'Configure disposable shared site state'
+echo '=== Verify v16 candidate Python and Node runtimes ==='
+docker run --rm --entrypoint bash "$TEST_IMAGE" -ec '
+  set -euo pipefail
+  python --version
+  node --version
+  python -c "import sys; assert sys.version_info >= (3, 14), sys.version"
+  node -e "if (Number(process.versions.node.split(\".\")[0]) !== 24) process.exit(1)"
+'
+
+echo '=== Configure disposable Frappe sites volume ==='
 docker run --rm --network "$network" \
   -v "$volume:/home/frappe/frappe-bench/sites" \
   --entrypoint bash "$TEST_IMAGE" -ec '
     set -euo pipefail
-    ls -1 apps > sites/apps.txt
+    printf "%s\n" frappe erpnext hrms crm telephony helpdesk payments lms raven offsite_backups > sites/apps.txt
     bench set-config -g db_host "$1"
     bench set-config -gp db_port 3306
     bench set-config -g redis_cache "redis://$2:6379"
@@ -63,7 +104,7 @@ docker run --rm --network "$network" \
     bench set-config -gp socketio_port 9000
   ' _ "$db" "$redis"
 
-echo 'Create disposable Frappe v16 site; install all nine apps and migrate'
+echo '=== Create isolated v16 site and install nine candidate applications ==='
 docker run --rm --network "$network" \
   -v "$volume:/home/frappe/frappe-bench/sites" \
   -e SMOKE_SITE -e TEST_DB_PASSWORD -e TEST_ADMIN_PASSWORD \
@@ -83,5 +124,6 @@ docker run --rm --network "$network" \
     bench --site "$SMOKE_SITE" list-apps
     bench --site "$SMOKE_SITE" execute frappe.db.sql \
       --args "[\"SELECT DATABASE(), VERSION()\"]"
-    echo "SMOKE SUCCESS: Frappe v16 with nine Suite apps and MariaDB 11.8"
+    bench version --format plain
+    echo "SMOKE SUCCESS: Nine v16 candidate apps installed and migrated with MariaDB 11.8"
   '
