@@ -30,6 +30,15 @@ Status: **PREPARATION ONLY — DO NOT DEPLOY TO CURRENT STAGING YET.**
 - Test actual Docker/Redis/Traefik/NFS behavior, not just fresh Bench installs.
 - Insights remains on a separate VM/site and is not included in this Suite migration.
 
+## Verified candidate build and fresh-site smoke test (2026-11-03)
+
+- **Completed:** GitHub Actions run [41627916016](https://github.com/Ben-001-sys/Frappie-prod/actions/runs/41627916016) built and published the separate v16 candidate image and successfully ran the disposable nine-app fresh-install smoke test.
+- Immutable candidate image: `ghcr.io/ben-001-sys/frappie-suite-v16-candidate@sha256:49a29105cfe6d99101e37ec92009d7510cddc31ef60ff4bf2daca9cde59d5383`.
+- Tested against Python 3.14.10, Node 24.22.2, MariaDB 11.8.9 and Redis 7.4. The installed Frappe 16.54.0 / ERPNext 16.53.0 / HRMS 16.53.0 and remaining dependencies were recorded in `release/v16-candidate-smoke-20261103.json`.
+- The isolated smoke test created a new site, installed ERPNext, HRMS, CRM, Telephony, Helpdesk, Payments, LMS, Raven and Offsite Backups, then ran `bench migrate` successfully.
+- **Still unverified:** v15-to-v16 migration of the existing staging database/files, existing Backblaze B2 configuration/restore, production-like business workflows, multi-host runtime operation and upgrade rollback. Do not merge, redeploy or run staging migration based on the fresh-install test alone.
+- The v15 operational Docker image, MariaDB 10.11 data volume, NFS sites and Dokploy deployments remain unchanged.
+
 ## Release gates
 
 1. Confirm existing v15 staging recovery remains healthy. Independently verify complete downloadable Backblaze backup (DB, config, public and private archives) and preserve additional local full backup and database dump, including encryption key if later generated.
