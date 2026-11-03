@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "classification": "v16-candidate-fresh-install-smoke-passed",
+  "deployment_approval": false,
+  "created_utc": "2026-11-03",
+  "source_branch": "upgrade/v16-staging-20261103",
+  "build_source_commit": "6a0fba4f8f4f024c30480e0c9e8187d3740d28af",
+  "candidate_image": "ghcr.io/ben-001-sys/frappie-suite-v16-candidate@sha256:49a29105cfe6d99101e37ec92009d7510cddc31ef60ff4bf2daca9cde59d5383",
+  "previous_v15_image": "ghcr.io/ben-001-sys/frappie-suite@sha256:aad7925a4b03639aa3834d53098b2c09b7a7fd46c7486faace6d9e142a132a8c",
+  "build_context": {
+    "frappe_docker_commit": "fbf76edcf5791b1d9743955b85caf0a19974d5a6",
+    "frappe_ref": "v16.54.0",
+    "dockerfile": "images/frappe-suite-v16/Containerfile",
+    "apps_manifest": "apps/suite-v16-candidate.json",
+    "smoke_script": "scripts/smoke-install-v16.sh"
+  },
+  "verified_on_disposable_ci_runner": {
+    "runtime": {
+      "python": "3.14.10",
+      "node": "24.22.2",
+      "mariadb": "11.8.9"
+    },
+    "installed_apps": {
+      "frappe": "16.54.0",
+      "erpnext": "16.53.0",
+      "hrms": "16.53.0",
+      "crm": "1.91.1",
+      "telephony": "0.0.1",
+      "helpdesk": "1.31.1",
+      "payments": "0.0.1",
+      "lms": "2.68.0",
+      "raven": "3.2.0",
+      "offsite_backups": "0.0.1"
+    },
+    "fresh_site_create": "passed",
+    "all_nine_apps_install": "passed",
+    "fresh_site_bench_migrate": "passed",
+    "smoke_test_database": "disposable MariaDB 11.8.9 (not operational MariaDB)"
+  },
+  "evidence": {
+    "github_actions_run_id": 41627916016,
+    "build_job_id": 125889868829,
+    "smoke_job_id": 125904267274,
+    "github_actions_url": "https://github.com/Ben-001-sys/Frappie-prod/actions/runs/41627916016"
+  },
+  "outstanding_gates": {
+    "independently_verified_v15_full_recovery_set": "pending",
+    "isolated_copy_of_current_staging_database_and_files": "not-run",
+    "v15_to_v16_database_migration": "not-run",
+    "application_business_workflow_validation": "not-run",
+    "backblaze_offsite_backup_job_on_v16": "not-run",
+    "staging_deployment": "not-approved"
+  },
+  "safety": {
+    "dokploy_changed": false,
+    "operational_v15_database_changed": false,
+    "operational_nfs_changed": false,
+    "notes": "Build and disposable smoke test only; no permission to deploy or merge."
+  }
+}
