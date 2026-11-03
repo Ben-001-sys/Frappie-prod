@@ -43,7 +43,7 @@ Status: **PREPARATION ONLY — DO NOT DEPLOY TO CURRENT STAGING YET.**
 
 ## Build/test note
 
-The existing `.github/workflows/build-images.yml` publishes v15 Suite and Insights images and is deliberately untouched. A v16 image build workflow must be reviewed separately before being enabled. Do not use the v15 smoke pipeline's MariaDB 10.11 for v16 validation.
+The existing `.github/workflows/build-images.yml` publishes v15 Suite and Insights images and remains untouched. The separate `.github/workflows/build-v16-candidate.yml` was added to this draft branch on 2026-11-03; it publishes only `ghcr.io/ben-001-sys/frappie-suite-v16-candidate`, never the approved v15 image. The candidate Dockerfile (`images/frappe-suite-v16/Containerfile`) uses the pinned `frappe_docker` source at `fbf76edcf5791b1d9743955b85caf0a19974d5a6`, v16 base layers and the exact Frappe tag `v16.54.0`. It then runs `scripts/smoke-install-v16.sh` against *disposable* MariaDB 11.8 and Redis instances, with one-run-only passwords and separate Docker volume/network names. This is **not** a migrated staging clone and does not satisfy the upgrade rehearsal gate. The workflow includes no Dokploy deployment step. Record successful build and test evidence and the published digest before using the candidate in the subsequent rehearsal. Do not use the v15 smoke pipeline's MariaDB 10.11 for v16 validation.
 
 ## References
 
