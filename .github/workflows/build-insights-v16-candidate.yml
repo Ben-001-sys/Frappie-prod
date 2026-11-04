@@ -1,0 +1,124 @@
+name: Build Insights v3 on Frappe v16 (NO DEPLOY)
+
+on:
+  push:
+    branches: [deploy/insights-staging-20261104]
+    paths:
+      - 'apps/insights-v16-candidate.json'
+      - 'images/frappe-insights-v16/Containerfile'
+      - 'scripts/smoke-install-insights-v16.sh'
+      - '.github/workflows/build-insights-v16-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: insights-v16-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build isolated Insights v16 candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Checkout pinned Frappe Docker build context
+        uses: actions/checkout@v4
+        with:
+          repository: frappe/frappe_docker
+          ref: fbf76edcf5791b1d9743955b85caf0a19974d5a6
+          path: upstream/frappe_docker
+          persist-credentials: false
+      - name: Validate candidate files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool apps/insights-v16-candidate.json >/dev/null
+          bash -n scripts/smoke-install-insights-v16.sh
+          test -f images/frappe-insights-v16/Containerfile
+          python - <<'PY'
+          import json
+          apps = json.load(open("apps/insights-v16-candidate.json", encoding="utf-8"))
+          assert apps == [{"url": "https://github.com/frappe/insights", "branch": "v3.15.1"}]
+          print("Pinned Insights version validated")
+          PY
+      - name: Configure Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log into GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish unmodified Frappe v16 image with Insights
+        id: image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./upstream/frappe_docker
+          file: ./images/frappe-insights-v16/Containerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/ben-001-sys/frappie-insights-v16-candidate:sha-${{ github.sha }}
+          secret-files: |
+            apps_json=./apps/insights-v16-candidate.json
+          build-args: |
+            FRAPPE_BRANCH=version-16
+            FRAPPE_REF=v16.54.0
+            FRAPPE_PATH=https://github.com/frappe/frappe
+            CACHE_BUST=${{ github.sha }}
+          cache-from: type=gha,scope=insights-v16-candidate
+          cache-to: type=gha,mode=max,scope=insights-v16-candidate
+          provenance: mode=max
+          sbom: true
+      - name: Record digest
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          echo '### Insights v3.15.1 + Frappe 16.54.0 candidate — not deployed' >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/ben-001-sys/frappie-insights-v16-candidate@${DIGEST}" >> "$GITHUB_STEP_SUMMARY"
+
+  smoke:
+    name: Install and migrate disposable Insights/MariaDB 11.8 site
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: read
+    env:
+      TEST_IMAGE: ghcr.io/ben-001-sys/frappie-insights-v16-candidate@${{ needs.build.outputs.digest }}
+      SMOKE_SITE: insights-v16-smoke.local
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Authenticate to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate disposable test passwords
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_PASSWORD="$(openssl rand -hex 24)"
+          ADMIN_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$DB_PASSWORD"
+          echo "::add-mask::$ADMIN_PASSWORD"
+          echo "TEST_DB_PASSWORD=$DB_PASSWORD" >> "$GITHUB_ENV"
+          echo "TEST_ADMIN_PASSWORD=$ADMIN_PASSWORD" >> "$GITHUB_ENV"
+      - name: Smoke-test stable Insights on Frappe v16 and MariaDB 11.8
+        shell: bash
+        run: bash scripts/smoke-install-insights-v16.sh
+      - name: Record test result
+        if: success()
+        run: |
+          echo '### PASS — disposable Insights v3 / Frappe v16 installation' >> "$GITHUB_STEP_SUMMARY"
+          echo "Validated image: $TEST_IMAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Does not establish an existing-site upgrade.' >> "$GITHUB_STEP_SUMMARY"
