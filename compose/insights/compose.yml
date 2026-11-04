@@ -40,7 +40,13 @@ services:
     restart: "no"
     entrypoint: ["bash", "-ec"]
     command: |
+      cd /home/frappe/frappe-bench
       ls -1 apps > sites/apps.txt
+      # On a new named volume, Bench needs this config file to exist
+      # before any global set-config call. Match the working App fix.
+      if [ ! -e sites/common_site_config.json ]; then
+        (umask 077; printf '{}\n' > sites/common_site_config.json)
+      fi
       bench set-config -g db_host insights-db
       bench set-config -gp db_port 3306
       bench set-config -g redis_cache redis://redis-cache:6379
@@ -57,6 +63,7 @@ services:
 
   backend:
     <<: *insights
+    command: ["start.sh"]
     depends_on:
       configurator:
         condition: service_completed_successfully
