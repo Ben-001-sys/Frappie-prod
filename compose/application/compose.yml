@@ -16,7 +16,7 @@ x-frappe-common: &frappe-common
     - verify-sites-nfs
   volumes:
     - type: bind
-      source: /mnt/frappe-sites/frappe-site-data
+      source: /mnt/frappe-sites/cetech-production-sites
       target: /home/frappe/frappe-bench/sites
       bind:
         create_host_path: false
