@@ -1,23 +1,37 @@
 services:
   mariadb:
-    image: ${MARIADB_IMAGE:?Select compatible MariaDB image}
+    image: ${MARIADB_IMAGE:?Set compatible MariaDB 11.8 image}
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Set in Dokploy securely}
+      # The password file is provisioned on the database host and is never committed.
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/mariadb_root_password
+      # One-time remote Frappe site provisioning must use a separate, temporary SQL user.
       MARIADB_ROOT_HOST: localhost
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --skip-character-set-client-handshake
+      - --innodb-snapshot-isolation=OFF
+      - --innodb-buffer-pool-size=768M
+      - --max-connections=100
     ports:
-      - "${DB_PRIVATE_IP:?Database private IP}:3306:3306"
+      - "${DB_PRIVATE_IP:?Set OVH private IP}:3306:3306"
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - type: bind
+        source: /srv/cetech-production/mariadb
+        target: /var/lib/mysql
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/cetech-production/secrets/mariadb_root_password
+        target: /run/secrets/mariadb_root_password
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
-volumes:
-  mariadb_data:
+    stop_grace_period: 90s
