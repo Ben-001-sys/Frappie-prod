@@ -29,10 +29,12 @@ services:
     # Keep redis-queue on its existing Redis 7.4 image and persistent volume.
     image: ${REDIS_CACHE_IMAGE:?Set Redis 8 image with built-in Search}
     restart: unless-stopped
-    command: ["redis-server", "--save", "", "--appendonly", "no", "--aclfile", "/run/redis/cache.acl"]
+    # Persist cache-hosted RediSearch index definitions/data across restarts.
+    command: ["redis-server", "--save", "", "--appendonly", "yes", "--appendfsync", "everysec", "--aclfile", "/run/redis/cache.acl"]
     ports:
       - "${WORKER_PRIVATE_IP:?Worker private address}:6379:6379"
     volumes:
+      - redis_cache_data:/data
       - type: bind
         source: ${REDIS_ACL_DIR:?Private Redis ACL path}/cache.acl
         target: /run/redis/cache.acl
@@ -74,4 +76,5 @@ services:
     depends_on: [redis-queue]
 
 volumes:
+  redis_cache_data:
   redis_queue_data:
