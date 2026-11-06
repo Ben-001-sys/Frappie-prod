@@ -7,6 +7,7 @@ set -euo pipefail
 : "${TEST_ADMIN_PASSWORD:?Missing disposable Administrator password}"
 
 SITE="${SMOKE_SITE:-insights-v16-smoke.local}"
+export SITE  # docker run -e SITE requires an exported variable
 PREFIX="insights-v16-smoke-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-$$"
 NETWORK="${PREFIX}-net"
 DB="${PREFIX}-db"
