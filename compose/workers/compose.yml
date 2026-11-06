@@ -25,7 +25,9 @@ x-frappe-worker: &frappe-worker
 
 services:
   redis-cache:
-    image: ${REDIS_IMAGE:?Set Redis image version}
+    # Redis 8 includes Search commands (FT.CREATE) needed by Helpdesk.
+    # Keep redis-queue on its existing Redis 7.4 image and persistent volume.
+    image: ${REDIS_CACHE_IMAGE:?Set Redis 8 image with built-in Search}
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no", "--aclfile", "/run/redis/cache.acl"]
     ports:
